@@ -1,0 +1,18 @@
+clip @ git+https://github.com/openai/CLIP.git@a9b1bf5920416aaeaec965c25dd9e8f98c864f16
+pandas==1.4.2
+opencv-python==4.8.0.76
+nni==3.0
+numpy==1.26.4
+transformers==4.33.2
+omegaconf
+iopath
+timm
+decord
+webdataset
+fairscale
+einops
+scikit-image
+spacy
+pycocoevalcap
+comet-ml
+streamlit

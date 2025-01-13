@@ -5,7 +5,6 @@ from models import CIRPlus
 from data_utils import squarepad_transform, targetpad_transform, WikiartDataset
 from config import *
 import json
-from annoy import AnnoyIndex
 import os
 
 
@@ -56,17 +55,7 @@ def save_image_data(clip_model, preprocess, file_path):
 
     with open(os.path.join(file_path, 'unique_metadata.json'), 'w') as f:
         json.dump(unique_metadata, f, indent=4)
-        
-def save_annoy_index(index_features, file_path):
-  vector_dim = 640
-  index = AnnoyIndex(vector_dim, 'angular')
 
-  for i, vector in enumerate(index_features):
-      index.add_item(i, vector)
-  
-  index.build(n_trees=10)
-  index.save(os.path.join(file_path,'image_index.ann'))
-  
 def load_index_features(metadata_path, feature_path):
   with open(metadata_path, 'rb') as f:
     image_metadata = pickle.load(f)

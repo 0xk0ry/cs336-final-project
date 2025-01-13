@@ -9,7 +9,6 @@ from operator import itemgetter
 from tqdm import tqdm
 import multiprocessing
 from pathlib import Path
-from spellchecker import SpellChecker
 import re
 from models import CIRPlus
 from typing import List, Tuple
@@ -20,12 +19,9 @@ from PIL import Image
 from utils import collate_fn, element_wise_sum, device
 from clip.model import CLIP
 import torch.nn.functional as F
-import ast 
-from inference import predictions
 from offline_stage import load_index_features
 from config import *
 import json
-from annoy import AnnoyIndex
 import time
 
 st.set_page_config(

@@ -8,7 +8,6 @@ from operator import itemgetter
 from tqdm import tqdm
 import multiprocessing
 from pathlib import Path
-from spellchecker import SpellChecker
 import re
 from models import CIRPlus
 from typing import List, Tuple
@@ -20,25 +19,6 @@ from utils import collate_fn, element_wise_sum, device
 from clip.model import CLIP
 import pickle
 import torch.nn.functional as F
-
-def preprocess_text_query(text_query: str) -> str:
-    """
-    Preprocess the text query to handle typos and normalize text.
-    """
-    # Initialize spell checker
-    spell = SpellChecker()
-    
-    # Tokenize query into words and correct typos
-    words = text_query.split()
-    corrected_words = [spell.correction(word) for word in words]
-    
-    # Join corrected words
-    corrected_text = ' '.join(corrected_words)
-    
-    # Normalize text: lowercase and remove unwanted characters
-    normalized_text = re.sub(r'[^a-zA-Z0-9\s]', '', corrected_text).lower().strip()
-    
-    return normalized_text
 
 def predictions(image_query, text_query, clip_model, preprocess, combining_function):
     # print("Compute CIRR validation predictions for a single query")
