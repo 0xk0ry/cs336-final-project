@@ -47,10 +47,16 @@ class UI:
             st.sidebar.button("Clear image Selection", on_click=self.handle_clear_image)
             # st.sidebar.button("Clear image Selection", key=f"clear_{st.session_state.ui_key}", on_click=self.handle_clear_image)
                 # st.session_state.ui_key += 1  # Force re-render
-                
+        # File uploader
+        uploaded_file = st.sidebar.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
+        if uploaded_file is not None:
+            image = Image.open(uploaded_file)
+            st.session_state.image_query = uploaded_file.name
+            image.save(os.path.join('wikiart/images', uploaded_file.name))
+                        
         if st.session_state.image_query != '':
             st.sidebar.markdown("**Selected Image:**")
-            st.sidebar.image(os.path.join('wikiart-og/images', st.session_state.image_query), caption=st.session_state.image_query)
+            st.sidebar.image(os.path.join('wikiart/images', st.session_state.image_query), caption=st.session_state.image_query)
         
         # Metadata filtering
         self.include_artists = st.sidebar.multiselect("Include Artists", unique_metadata['artists'])
@@ -63,6 +69,7 @@ class UI:
         self.exclude_art_styles = st.sidebar.multiselect("Exclude Art Styles", unique_metadata['art_styles'])
         self.include_genres = st.sidebar.multiselect("Include Genres", unique_metadata['genres'])
         self.exclude_genres = st.sidebar.multiselect("Exclude Genres", unique_metadata['genres'])
+    
     
     def handle_clear_image(self):
         st.session_state.image_query = ''
@@ -98,7 +105,7 @@ def display_metadata(text_query, image_metadata, col):
         
         col1, col2 = st.columns([0.65,0.35])
         with col1:
-            st.image(os.path.join('wikiart-og/images', image_name), caption=image_metadata['title'])
+            st.image(os.path.join('wikiart/images', image_name), caption=image_metadata['title'])
         with col2:
             st.write(f"**Title:** {image_metadata['title']}")
             st.write(f"**Year:** {image_metadata['year']}")
@@ -108,7 +115,7 @@ def display_metadata(text_query, image_metadata, col):
             st.button("Use as input", on_click=handle_image_query, args=(image_name,))
         
         if st.session_state.show_more_clicked_metadata == False:
-            image_path = os.path.join('wikiart-og/images', image_name)
+            image_path = os.path.join('wikiart/images', image_name)
             text_features, image_features = get_features(text_query, image_path)
             
             sorted_indexes = get_predictions(
@@ -132,7 +139,7 @@ def display_metadata(text_query, image_metadata, col):
             if st.session_state.sorted_index_metadata[i] in st.session_state.sorted_index[:st.session_state.show_count]:
                 continue
             else:
-                image_path = os.path.join('wikiart-og/images', images_metadata[st.session_state.sorted_index_metadata[i]]['image_name'])
+                image_path = os.path.join('wikiart/images', images_metadata[st.session_state.sorted_index_metadata[i]]['image_name'])
                 columns[count % 3].image(image_path)
                 columns[count % 3].button(f"{images_metadata[st.session_state.sorted_index_metadata[i]]['title']}", on_click=handle_image_selection, args=(text_query, images_metadata[st.session_state.sorted_index[i]], col),key={images_metadata[st.session_state.sorted_index[i]]['image_name']})
                 count+=1
@@ -156,7 +163,7 @@ def display_image_gallery(text_query, sorted_indexes, col1, col2, show_count):
         count = 0
         with col1:
             for i, index in enumerate(sorted_indexes[:st.session_state.show_count]):
-                image_path = os.path.join('wikiart-og/images', images_metadata[index]['image_name'])
+                image_path = os.path.join('wikiart/images', images_metadata[index]['image_name'])
                 columns[count % 3].image(image_path)
                 if columns[count % 3].button(f"{images_metadata[index]['title']}", key=f"{image_path}_{i}"):
                     st.session_state.selected_image_metadata = images_metadata[index]
@@ -227,7 +234,7 @@ def main():
         
         st.session_state.use_image_as_input_clicked = False
         if st.session_state.image_query != '':
-            image_path = os.path.join('wikiart-og\images', st.session_state.image_query)
+            image_path = os.path.join('wikiart\images', st.session_state.image_query)
         else:
             image_path = None
         text_features, image_features = get_features(ui.text_query, image_path)
@@ -323,7 +330,7 @@ if 'show_more_clicked_metadata' not in st.session_state:
 if 'show_count_metadata' not in st.session_state:
     st.session_state.show_count_metadata = 12
 clip_model, preprocess, combining_function = load_model()
-images_metadata, index_features, index_names = load_index_features('wikiart-og/image_data.pickle', 'wikiart-og/image_feature.pickle')
-unique_metadata = json.load(open('wikiart-og/unique_metadata.json', 'r')) 
+images_metadata, index_features, index_names = load_index_features('wikiart/image_data.pickle', 'wikiart/image_feature.pickle')
+unique_metadata = json.load(open('wikiart/unique_metadata.json', 'r')) 
 ui = UI()
 main()

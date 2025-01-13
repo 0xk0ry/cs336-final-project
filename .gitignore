@@ -1,4 +1,6 @@
 wikiart-landscape/
-wikiart-og/
+wikiart/
 *.pt
 __pycache__/
+
+.gitignore
