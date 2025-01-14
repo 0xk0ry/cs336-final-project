@@ -128,6 +128,7 @@ def display_metadata(text_query, image_metadata, col):
                 combining_function
             )
             
+            # st.session_state.sorted_index_metadata = filter_index(sorted_indexes[0].tolist())
             st.session_state.sorted_index_metadata = filter_index(sorted_indexes[0].tolist())
         col1, col2, col3 = st.columns(3)
         columns = [col1, col2, col3]
@@ -135,14 +136,12 @@ def display_metadata(text_query, image_metadata, col):
         count = 0
         i = 0
         while count < st.session_state.show_count_metadata and i < len(st.session_state.sorted_index_metadata):
+            image = images_metadata[st.session_state.sorted_index_metadata[i]]
+            image_path = os.path.join('wikiart/images', image['image_name'])
+            columns[count % 3].image(image_path)
+            columns[count % 3].button(f"{image['title']}", on_click=handle_image_selection, args=(text_query, image, col),key={image['image_name']})
             i+=1
-            if st.session_state.sorted_index_metadata[i] in st.session_state.sorted_index[:st.session_state.show_count]:
-                continue
-            else:
-                image_path = os.path.join('wikiart/images', images_metadata[st.session_state.sorted_index_metadata[i]]['image_name'])
-                columns[count % 3].image(image_path)
-                columns[count % 3].button(f"{images_metadata[st.session_state.sorted_index_metadata[i]]['title']}", on_click=handle_image_selection, args=(text_query, images_metadata[st.session_state.sorted_index[i]], col),key={images_metadata[st.session_state.sorted_index[i]]['image_name']})
-                count+=1
+            count+=1
             # Show more button
         st.markdown('---')
         if st.session_state.show_count_metadata + 6 < len(st.session_state.sorted_index_metadata):
@@ -226,6 +225,20 @@ def filter_index(sorted_indexes):
            (not ui.include_genres or image_metadata['genre'] in ui.include_genres) and \
            (not ui.exclude_genres or image_metadata['genre'] not in ui.exclude_genres):
             filtered_indexes.append(index)
+
+    if ui.text_query:
+        text_query = [word for word in ui.text_query.lower().split(" ")]
+        
+        query_words = [word for word in text_query if word in metadata_list]
+        
+        filtered_indexes.sort(key=lambda idx: sum(
+            word in images_metadata[idx]['artist'].lower() or
+            word in images_metadata[idx]['title'].lower() or
+            word in str(images_metadata[idx]['year']).lower() or
+            word in images_metadata[idx]['art_style'].lower() or
+            word in images_metadata[idx]['genre'].lower()
+            for word in query_words
+        ), reverse=True)
     return filtered_indexes
 
 def main():
@@ -331,6 +344,7 @@ if 'show_count_metadata' not in st.session_state:
     st.session_state.show_count_metadata = 12
 clip_model, preprocess, combining_function = load_model()
 images_metadata, index_features, index_names = load_index_features('wikiart/image_data.pickle', 'wikiart/image_feature.pickle')
-unique_metadata = json.load(open('wikiart/unique_metadata.json', 'r')) 
+unique_metadata = json.load(open('wikiart/unique_metadata.json', 'r'))
+metadata_list = json.load(open('wikiart/metadata_dictionary.json', 'r'))
 ui = UI()
 main()

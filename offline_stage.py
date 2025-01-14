@@ -6,13 +6,18 @@ from data_utils import squarepad_transform, targetpad_transform, WikiartDataset
 from config import *
 import json
 import os
-
+import json
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+import csv
 
 def save_image_data(clip_model, preprocess, file_path):
     # Define the validation datasets and extract the index features
-    wikiart_dataset = WikiartDataset('wikiart-og', preprocess)
+    wikiart_dataset = WikiartDataset(file_path, preprocess)
     index_features, index_names = extract_index_features(wikiart_dataset, clip_model)
-    json_obj = json.load(open('wikiart-og/metadata.json', 'r'))
+    json_obj = json.load(open(os.path.join(file_path, 'metadata.json'), 'r'))
     images_metadata = []
     unique_artists = set()
     unique_titles = set()
@@ -56,6 +61,59 @@ def save_image_data(clip_model, preprocess, file_path):
     with open(os.path.join(file_path, 'unique_metadata.json'), 'w') as f:
         json.dump(unique_metadata, f, indent=4)
 
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
+
+    list_metadata = []
+
+    for entry in unique_metadata.values():
+        for value in entry:
+            words = value.replace("-", " ").replace("_", " ").split(" ")
+            for word in words:
+                normalized_word = word.lower()
+                lemmatized_word = lemmatizer.lemmatize(normalized_word)
+                if lemmatized_word.isalpha() and len(lemmatized_word) > 1 and lemmatized_word not in stop_words:
+                    list_metadata.append(lemmatized_word)
+
+    list_metadata = list(set(list_metadata))
+    list_metadata_alphabetically = sorted(list_metadata)
+    with open(os.path.join(file_path, 'metadata_dictionary.json'), 'w') as f:
+        json.dump(list_metadata_alphabetically, f)
+
+def create_metadata_json(images_folder):
+    annotations_folder = os.path.join(images_folder, "annotations")
+    output_json = os.path.join(images_folder, "metadata.json")
+    metadata_list = []
+
+    # Iterate through all CSV files in the annotations folder
+    for csv_file in os.listdir(annotations_folder):
+        if csv_file.endswith('.csv'):
+            genre = os.path.splitext(csv_file)[0]  # Get the genre from the file name
+            csv_path = os.path.join(annotations_folder, csv_file)
+            
+            with open(csv_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    image_path = row['filename'] + '.jpg'
+                    full_image_path = os.path.join(images_folder, "images", image_path)
+                    
+                    # Check if the image file exists
+                    if os.path.exists(full_image_path):
+                        metadata = {
+                            "image_path": image_path,
+                            "url": row.get('url', 'None') or 'None',
+                            "title": row.get('title', 'None') or 'None',
+                            "year": row.get('year', 'None') or 'None',
+                            "artist": row.get('artist', 'None') or 'None',
+                            "art_style": row.get('art_style', 'None') or 'None',
+                            "genre": genre
+                        }
+                        metadata_list.append(metadata)
+
+    # Save the metadata list as a JSON file
+    with open(output_json, 'w', encoding='utf-8') as f:
+        json.dump(metadata_list, f, indent=4)
+        
 def load_index_features(metadata_path, feature_path):
   with open(metadata_path, 'rb') as f:
     image_metadata = pickle.load(f)
@@ -95,6 +153,9 @@ if __name__ == '__main__':
   else:
     print('CLIP default preprocess pipeline is used')
     preprocess = clip_preprocess
-  save_image_data(clip_model, preprocess, 'wikiart-og')
+  nltk.download('stopwords')
+  nltk.download('wordnet')
+  create_metadata_json('wikiart')
+  save_image_data(clip_model, preprocess, 'wikiart')
   
   
