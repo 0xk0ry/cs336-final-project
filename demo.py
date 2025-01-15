@@ -10,7 +10,7 @@ from tqdm import tqdm
 import multiprocessing
 from pathlib import Path
 import re
-from models import CIRPlus
+from models import CIRPlus, CLIPGradCAM
 from typing import List, Tuple
 from torch.utils.data import DataLoader
 from data_utils import squarepad_transform, targetpad_transform, WikiartDataset
@@ -23,6 +23,7 @@ from offline_stage import load_index_features
 from config import *
 import json
 import time
+import cv2
 
 st.set_page_config(
     layout="wide",
@@ -106,6 +107,7 @@ def display_metadata(text_query, image_metadata, col):
         col1, col2 = st.columns([0.65,0.35])
         with col1:
             st.image(os.path.join('wikiart/images', image_name), caption=image_metadata['title'])
+
         with col2:
             st.write(f"**Title:** {image_metadata['title']}")
             st.write(f"**Year:** {image_metadata['year']}")
@@ -180,12 +182,13 @@ def get_average_features(sorted_indexes):
 def get_predictions(image_features, text_features, clip_model: CLIP, preprocess, 
                    index_features: torch.tensor, index_names: List[str], 
                    combining_function: callable):
-    # Combine features if available
-    if image_features != None:
+    if text_features != None and image_features != None:
         final_features = combining_function(text_features, image_features)
-    else:
+    elif text_features != None:
         final_features = text_features
-    
+    else:
+        final_features = image_features
+        
     # Normalize index features
     index_features = F.normalize(index_features, dim=-1).float()
     # Calculate similarities
@@ -196,42 +199,65 @@ def get_predictions(image_features, text_features, clip_model: CLIP, preprocess,
     return indices
 
 def get_features(text_query, image_path = None):
+    if text_query == None:
+        text_query = ''
     text_tokens = clip.tokenize([text_query]).to(device)
         
     with torch.no_grad():
-        text_features = clip_model.encode_text(text_tokens)
-        text_features /= text_features.norm(dim=-1, keepdim=True)
+        if text_query != None:
+            text_features = clip_model.encode_text(text_tokens)
+            text_features = text_features / text_features.norm(dim=-1, keepdim=True)
         if image_path != None:
             image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
             image_features = clip_model.encode_image(image)
-            image_features /= image_features.norm(dim=-1, keepdim=True)
+            image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         else:
-            image_features = None
+            image_features = torch.zeros_like(index_features[0]).unsqueeze(0).to(device)
     return text_features, image_features
     
 def filter_index(sorted_indexes):
-    # Filter images based on include and exclude tags
-    filtered_indexes = []
+    include_artists = set(ui.include_artists) if ui.include_artists else None
+    exclude_artists = set(ui.exclude_artists) if ui.exclude_artists else None
     include_titles = [word.strip().lower() for word in ui.include_titles.split(',')] if ui.include_titles else []
     exclude_titles = [word.strip().lower() for word in ui.exclude_titles.split(',')] if ui.exclude_titles else []
-    for index in sorted_indexes:
-        image_metadata = images_metadata[index] 
-        if (not ui.include_artists or image_metadata['artist'] in ui.include_artists) and \
-           (not ui.exclude_artists or image_metadata['artist'] not in ui.exclude_artists) and \
-           (not include_titles or any(include_title in image_metadata['title'].lower() for include_title in include_titles)) and \
-           (not exclude_titles or all(exclude_title not in image_metadata['title'].lower() for exclude_title in exclude_titles)) and \
-           (not ui.include_years or image_metadata['year'] in ui.include_years) and \
-           (not ui.exclude_years or image_metadata['year'] not in ui.exclude_years) and \
-           (not ui.include_art_styles or image_metadata['art_style'] in ui.include_art_styles) and \
-           (not ui.exclude_art_styles or image_metadata['art_style'] not in ui.exclude_art_styles) and \
-           (not ui.include_genres or image_metadata['genre'] in ui.include_genres) and \
-           (not ui.exclude_genres or image_metadata['genre'] not in ui.exclude_genres):
-            filtered_indexes.append(index)
-    return filtered_indexes
+    include_years = set(ui.include_years) if ui.include_years else None
+    exclude_years = set(ui.exclude_years) if ui.exclude_years else None
+    include_art_styles = set(ui.include_art_styles) if ui.include_art_styles else None
+    exclude_art_styles = set(ui.exclude_art_styles) if ui.exclude_art_styles else None
+    include_genres = set(ui.include_genres) if ui.include_genres else None
+    exclude_genres = set(ui.exclude_genres) if ui.exclude_genres else None
+
+    def passes_filters(idx):
+        meta = images_metadata[idx]
+        title_words = [w.strip().lower() for w in meta['title'].split(',')]
+        
+        if include_artists and meta['artist'] not in include_artists:
+            return False
+        if exclude_artists and meta['artist'] in exclude_artists:
+            return False
+        if include_titles and not any(t in w for t in include_titles for w in title_words):
+            return False
+        if exclude_titles and any(t in w for t in exclude_titles for w in title_words):
+            return False
+        if include_years and meta['year'] not in include_years:
+            return False
+        if exclude_years and meta['year'] in exclude_years:
+            return False
+        if include_art_styles and meta['art_style'] not in include_art_styles:
+            return False
+        if exclude_art_styles and meta['art_style'] in exclude_art_styles:
+            return False
+        if include_genres and meta['genre'] not in include_genres:
+            return False
+        if exclude_genres and meta['genre'] in exclude_genres:
+            return False
+        return True
+
+    return [i for i in sorted_indexes if passes_filters(i)]
 
 def main():
     col1, gap, col2 = st.columns([1, 0.05, 1])
-    if ui.text_query and not st.session_state.show_more_clicked:
+    if (ui.text_query or st.session_state.image_query) and not st.session_state.show_more_clicked:
         
         st.session_state.use_image_as_input_clicked = False
         if st.session_state.image_query != '':
@@ -239,6 +265,8 @@ def main():
         else:
             image_path = None
         text_features, image_features = get_features(ui.text_query, image_path)
+        st.session_state.text_features = text_features
+        st.session_state.image_features = image_features
         start_time = time.time()
 
         # First query
@@ -282,7 +310,6 @@ def load_model():
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     model = CIRPlus(MODEL_NAME, transform=TRANSFORM, device=device)
     clip_model, clip_preprocess = model.clip, model.preprocess
-
     if MODEL_PATH:
         try:
             print('Streamlit trying to load the fine-tuned CLIP model')
