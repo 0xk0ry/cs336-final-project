@@ -61,8 +61,8 @@ class UI:
         # Metadata filtering
         self.include_artists = st.sidebar.multiselect("Include Artists", unique_metadata['artists'])
         self.exclude_artists = st.sidebar.multiselect("Exclude Artists", unique_metadata['artists'])
-        self.include_titles = st.sidebar.text_input("Title Include")
-        self.exclude_titles = st.sidebar.text_input("Title Exclude")
+        self.include_titles = st.sidebar.text_input("Title Include (Separate using ,)")
+        self.exclude_titles = st.sidebar.text_input("Title Exclude (Separate using ,)")
         self.include_years = st.sidebar.multiselect("Include Years", unique_metadata['years'])
         self.exclude_years = st.sidebar.multiselect("Exclude Years", unique_metadata['years'])
         self.include_art_styles = st.sidebar.multiselect("Include Art Styles", unique_metadata['art_styles'])
@@ -212,12 +212,14 @@ def get_features(text_query, image_path = None):
 def filter_index(sorted_indexes):
     # Filter images based on include and exclude tags
     filtered_indexes = []
+    include_titles = [word.strip().lower() for word in ui.include_titles.split(',')] if ui.include_titles else []
+    exclude_titles = [word.strip().lower() for word in ui.exclude_titles.split(',')] if ui.exclude_titles else []
     for index in sorted_indexes:
-        image_metadata = images_metadata[index]
+        image_metadata = images_metadata[index] 
         if (not ui.include_artists or image_metadata['artist'] in ui.include_artists) and \
            (not ui.exclude_artists or image_metadata['artist'] not in ui.exclude_artists) and \
-           (not ui.include_titles or ui.include_titles.lower() in image_metadata['title'].lower()) and \
-           (not ui.exclude_titles or ui.exclude_titles.lower() not in image_metadata['title'].lower()) and \
+           (not include_titles or any(include_title in image_metadata['title'].lower() for include_title in include_titles)) and \
+           (not exclude_titles or all(exclude_title not in image_metadata['title'].lower() for exclude_title in exclude_titles)) and \
            (not ui.include_years or image_metadata['year'] in ui.include_years) and \
            (not ui.exclude_years or image_metadata['year'] not in ui.exclude_years) and \
            (not ui.include_art_styles or image_metadata['art_style'] in ui.include_art_styles) and \
@@ -225,20 +227,6 @@ def filter_index(sorted_indexes):
            (not ui.include_genres or image_metadata['genre'] in ui.include_genres) and \
            (not ui.exclude_genres or image_metadata['genre'] not in ui.exclude_genres):
             filtered_indexes.append(index)
-
-    if ui.text_query:
-        text_query = [word for word in ui.text_query.lower().split(" ")]
-        
-        query_words = [word for word in text_query if word in metadata_list]
-        
-        filtered_indexes.sort(key=lambda idx: sum(
-            word in images_metadata[idx]['artist'].lower() or
-            word in images_metadata[idx]['title'].lower() or
-            word in str(images_metadata[idx]['year']).lower() or
-            word in images_metadata[idx]['art_style'].lower() or
-            word in images_metadata[idx]['genre'].lower()
-            for word in query_words
-        ), reverse=True)
     return filtered_indexes
 
 def main():
