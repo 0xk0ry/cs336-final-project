@@ -83,22 +83,25 @@ def save_image_data(clip_model, preprocess, file_path):
 def create_metadata_json(images_folder):
     annotations_folder = os.path.join(images_folder, "annotations")
     output_json = os.path.join(images_folder, "metadata.json")
-    metadata_list = []
+
+    # Use a dictionary keyed on 'image_path'
+    metadata_dict = {}
 
     # Iterate through all CSV files in the annotations folder
     for csv_file in os.listdir(annotations_folder):
         if csv_file.endswith('.csv'):
-            genre = os.path.splitext(csv_file)[0]  # Get the genre from the file name
+            genre = os.path.splitext(csv_file)[0]  # The genre from the file name
             csv_path = os.path.join(annotations_folder, csv_file)
-            
+
             with open(csv_path, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     image_path = row['filename'] + '.jpg'
                     full_image_path = os.path.join(images_folder, "images", image_path)
-                    
+
                     # Check if the image file exists
-                    if os.path.exists(full_image_path):
+                    if os.path.exists(full_image_path) and is_valid_image(full_image_path):
+                      
                         metadata = {
                             "image_path": image_path,
                             "url": row.get('url', 'None') or 'None',
@@ -108,12 +111,17 @@ def create_metadata_json(images_folder):
                             "art_style": row.get('art_style', 'None') or 'None',
                             "genre": genre
                         }
-                        metadata_list.append(metadata)
+                        if image_path not in metadata_dict:
+                            metadata_dict[image_path] = metadata
+                        else:
+                            # Update if already exists
+                            metadata_dict[image_path].update(metadata)
 
-    # Save the metadata list as a JSON file
+    # Convert the dictionary values to a list and write to JSON
     with open(output_json, 'w', encoding='utf-8') as f:
-        json.dump(metadata_list, f, indent=4)
-        
+        json.dump(list(metadata_dict.values()), f, indent=4)
+
+    
 def load_index_features(metadata_path, feature_path):
   with open(metadata_path, 'rb') as f:
     image_metadata = pickle.load(f)
@@ -156,6 +164,6 @@ if __name__ == '__main__':
   nltk.download('stopwords')
   nltk.download('wordnet')
   create_metadata_json('wikiart')
-  save_image_data(clip_model, preprocess, 'wikiart')
+  # save_image_data(clip_model, preprocess, 'wikiart')
   
   
