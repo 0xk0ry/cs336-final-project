@@ -46,8 +46,6 @@ class UI:
         self.text_query = st.sidebar.text_input("Enter your search query:", on_change=self.handle_query_change)
         if st.session_state.image_query != '':
             st.sidebar.button("Clear image Selection", on_click=self.handle_clear_image)
-            # st.sidebar.button("Clear image Selection", key=f"clear_{st.session_state.ui_key}", on_click=self.handle_clear_image)
-                # st.session_state.ui_key += 1  # Force re-render
         # File uploader
         uploaded_file = st.sidebar.file_uploader("Upload an image", type=["jpg", "jpeg", "png"])
         if uploaded_file is not None:
@@ -106,8 +104,8 @@ def display_metadata(text_query, image_metadata, col):
         
         col1, col2 = st.columns([0.65,0.35])
         with col1:
-            st.image(os.path.join('wikiart/images', image_name), caption=image_metadata['title'])
-
+            target_image_path = os.path.join('wikiart/images', image_name)
+            st.image(target_image_path, caption=image_metadata['title'])
         with col2:
             st.write(f"**Title:** {image_metadata['title']}")
             st.write(f"**Year:** {image_metadata['year']}")
@@ -296,11 +294,10 @@ def main():
         st.session_state.search_time = time.time() - start_time
         col1.write(f"Time taken for retrieval: {st.session_state.search_time:.5f} seconds")
         display_image_gallery(ui.text_query, st.session_state.sorted_index, col1, col2, 12)
-    elif ui.text_query:
+    elif (ui.text_query or st.session_state.image_query):
         col1.write(f"Time taken for predictions: {st.session_state.search_time:.5f} seconds")
         display_image_gallery(ui.text_query, st.session_state.sorted_index, col1, col2, 12)
 
-    # Display selected image metadata if available
     if 'selected_image_metadata' in st.session_state and st.session_state.selected_image_metadata != None:
         display_metadata(ui.text_query, st.session_state.selected_image_metadata, col2)
 
