@@ -7,11 +7,15 @@ from config import *
 import json
 import os
 import json
-import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 import csv
+import faiss
+import torch
+import torch.nn.functional as F
+from annoy import AnnoyIndex
+import numpy as np
 
 def save_image_data(clip_model, preprocess, file_path):
     # Define the validation datasets and extract the index features
@@ -80,6 +84,33 @@ def save_image_data(clip_model, preprocess, file_path):
     with open(os.path.join(file_path, 'metadata_dictionary.json'), 'w') as f:
         json.dump(list_metadata_alphabetically, f)
 
+def build_index(index_features):
+  # Ensure index_features is on CPU
+  if index_features.is_cuda:
+      index_features = index_features.cpu()
+
+  # Normalize the feature vectors
+  index_features = F.normalize(index_features, p=2, dim=1)
+
+  # Convert to numpy array
+  index_features_numpy = index_features.numpy()
+
+  # Build the FAISS index
+  index = faiss.IndexFlatIP(640)
+  index.add(index_features_numpy)
+  faiss.write_index(index, "wikiart/faiss_index.idx")
+
+  # Generate random data for demonstration (replace with your data)
+  d = 640  # Dimension of features
+
+  # Build Annoy index
+  index = AnnoyIndex(d, 'angular')  # Use Euclidean distance
+  for i, vector in enumerate(index_features):
+      index.add_item(i, vector)
+
+  index.build(5)
+  index.save('wikiart/annoy_index.ann')
+
 def create_metadata_json(images_folder):
     annotations_folder = os.path.join(images_folder, "annotations")
     output_json = os.path.join(images_folder, "metadata.json")
@@ -100,7 +131,7 @@ def create_metadata_json(images_folder):
                     full_image_path = os.path.join(images_folder, "images", image_path)
 
                     # Check if the image file exists
-                    if os.path.exists(full_image_path) and is_valid_image(full_image_path):
+                    if os.path.exists(full_image_path):
                       
                         metadata = {
                             "image_path": image_path,
@@ -164,6 +195,6 @@ if __name__ == '__main__':
   nltk.download('stopwords')
   nltk.download('wordnet')
   create_metadata_json('wikiart')
-  # save_image_data(clip_model, preprocess, 'wikiart')
+  save_image_data(clip_model, preprocess, 'wikiart')
   
   
