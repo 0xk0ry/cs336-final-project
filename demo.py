@@ -24,6 +24,8 @@ from config import *
 import json
 import time
 import cv2
+import faiss
+import annoy
 
 st.set_page_config(
     layout="wide",
@@ -44,6 +46,8 @@ class UI:
             st.session_state.ui_key = 0
             
         self.text_query = st.sidebar.text_input("Enter your search query:", on_change=self.handle_query_change)
+        self.indexing_type = st.sidebar.selectbox("Choose Indexing", ["None", "FAISS", "ANNOY"], index=0)
+        self.top_k = st.sidebar.number_input("Choose top-k for re-ranking", value=3)
         if st.session_state.image_query != '':
             st.sidebar.button("Clear image Selection", on_click=self.handle_clear_image)
         # File uploader
@@ -129,7 +133,7 @@ def display_metadata(text_query, image_metadata, col):
             )
             
             # st.session_state.sorted_index_metadata = filter_index(sorted_indexes[0].tolist())
-            st.session_state.sorted_index_metadata = filter_index(sorted_indexes[0].tolist())
+            st.session_state.sorted_index_metadata = filter_index(sorted_indexes)
         col1, col2, col3 = st.columns(3)
         columns = [col1, col2, col3]
 
@@ -179,23 +183,30 @@ def get_average_features(sorted_indexes):
 
 def get_predictions(image_features, text_features, clip_model: CLIP, preprocess, 
                    index_features: torch.tensor, index_names: List[str], 
-                   combining_function: callable):
+                   combining_function: callable, k: int = 0, index_type: str = None):
     if text_features != None and image_features != None:
         final_features = combining_function(text_features, image_features)
     elif text_features != None:
         final_features = text_features
     else:
         final_features = image_features
+    
+    if k <= 0 or index_type == "None":
+        # Normalize index features
+        index_features = F.normalize(index_features, dim=-1).float()
+        # Calculate similarities
+        distances = 1 - final_features @ index_features.T
         
-    # Normalize index features
-    index_features = F.normalize(index_features, dim=-1).float()
-    # Calculate similarities
-    distances = 1 - final_features @ index_features.T
+        indices = torch.argsort(distances, dim=-1).cpu().tolist()[0]
+        return indices
+    else:
+        if index_type == 'FAISS':
+            distances, indices = faiss_index.search(final_features.cpu().detach().numpy(), k)
+            indices = indices[0]
+        else:
+            indices = annoy_index.get_nns_by_vector(final_features.squeeze(0), k)
+        return indices
     
-    _, indices = distances.sort()
-    
-    return indices
-
 def get_features(text_query, image_path = None):
     if text_query == None:
         text_query = ''
@@ -275,11 +286,12 @@ def main():
             preprocess,
             index_features,
             index_names,
-            combining_function
+            combining_function,
+            ui.top_k,
+            ui.indexing_type
         )
         # Get average features
-        avg_features = get_average_features(sorted_indexes[:3])[0]
-
+        avg_features =  get_average_features(sorted_indexes[:ui.top_k if ui.top_k > 0 else min(3, len(sorted_indexes))])
         # Second query with averaged features
         sorted_indexes = get_predictions(
             avg_features.unsqueeze(0),
@@ -290,7 +302,8 @@ def main():
             index_names,
             combining_function
         )
-        st.session_state.sorted_index = filter_index(sorted_indexes[0].tolist())
+        avg_features =  get_average_features(sorted_indexes)
+        st.session_state.sorted_index = filter_index(sorted_indexes)
         st.session_state.search_time = time.time() - start_time
         col1.write(f"Time taken for retrieval: {st.session_state.search_time:.5f} seconds")
         display_image_gallery(ui.text_query, st.session_state.sorted_index, col1, col2, 12)
@@ -356,6 +369,9 @@ if 'show_count_metadata' not in st.session_state:
     st.session_state.show_count_metadata = 12
 clip_model, preprocess, combining_function = load_model()
 images_metadata, index_features, index_names = load_index_features('wikiart/image_data.pickle', 'wikiart/image_feature.pickle')
+faiss_index = faiss.read_index("wikiart/faiss_index.idx")
+annoy_index = annoy.AnnoyIndex(640, 'angular')
+annoy_index.load("wikiart/annoy_index.ann")
 unique_metadata = json.load(open('wikiart/unique_metadata.json', 'r'))
 metadata_list = json.load(open('wikiart/metadata_dictionary.json', 'r'))
 ui = UI()
