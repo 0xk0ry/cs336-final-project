@@ -32,6 +32,16 @@ This project is a retrieval system that combines image and text features for adv
    pip install -r requirements.txt
    ```
 
+   If you are using MacOS or Linux:
+   ```bash
+   pip install faiss-gpu
+   ```
+
+   If you are using Window or Conda:
+   ```bash
+   conda install conda-forge::faiss-gpu
+   ```
+
 3. **Download Checkpoints**
    - Download the pre-trained model checkpoints from the [release section](https://github.com/0xk0ry/cs336-final-project/releases/tag/release).
 

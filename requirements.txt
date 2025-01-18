@@ -16,3 +16,4 @@ spacy
 pycocoevalcap
 comet-ml
 streamlit
+annoy
