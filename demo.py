@@ -109,7 +109,7 @@ def display_metadata(text_query, image_metadata, col):
         col1, col2 = st.columns([0.65,0.35])
         with col1:
             target_image_path = os.path.join('wikiart/images', image_name)
-            st.image(target_image_path, caption=image_metadata['title'])
+            st.image(target_image_path, caption=image_name)
         with col2:
             st.write(f"**Title:** {image_metadata['title']}")
             st.write(f"**Year:** {image_metadata['year']}")
