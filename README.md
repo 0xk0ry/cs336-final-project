@@ -1,4 +1,5 @@
 # Class Project
+Video demo: https://youtu.be/QHFwrNNRP_E
 
 ## Team Members
 | Name                  | Email                  | GitHub                                  |
@@ -46,7 +47,7 @@ This project is a retrieval system that combines image and text features for adv
    - Download the pre-trained model checkpoints from the [release section](https://github.com/0xk0ry/cs336-final-project/releases/tag/release).
 
 4. **Download Images**
-   - Download the images from the [Google Drive](https://drive.google.com/file/d/1g6YUXX9hVENBmoPiYxj25G6YfPObnm4W/view?usp=sharing) and place them in the designated directory.
+   - Download the images from the [Google Drive](https://drive.google.com/file/d/1RMZjMo3n7k67Plk41-nbKHCUpZib7cB0/view?usp=sharing) and place them in the designated directory.
 
 5. **Run the Application**
    - Launch the Streamlit demo:
